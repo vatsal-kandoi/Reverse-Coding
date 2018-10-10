@@ -8,3 +8,5 @@ Reverse Coding Backend
 /deleteteam -> To delete your team, in case no one joins. If your team has been filled, deletion will not be allowed
 /dashboard -> To see if youre in a team, or not. Starting page after login
 /acceptinvite -> To accept invite from a user. After acception, no changes permitted
+
+Important: Send Authorization header with token obtained for athentication
