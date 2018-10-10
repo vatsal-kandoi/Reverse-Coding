@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 
 require('dotenv').config();
 
-mongoose.connect(process.env.URL);
+mongoose.connect(process.env.PRODURL || "mongodb://localhost:27017/RC");
 
 //SETTING UP SCHEMA
 var Schema=mongoose.Schema;
@@ -89,6 +89,7 @@ function authorization(req,res,next){
                 res.status(401).send('Try logging in again');
             }
             else{
+                res.header('Authorization',req.get('Authorization'));
                 next();
             }
         }    
@@ -111,9 +112,9 @@ app.post('/signup',cors,function(req,res){
         },function(err,docs){
             if(err){
                 if(err.code=11000){
-                    res.status(401).send('Duplicate');
+                    res.status(401).send('USEREXISTS');
                 } else{
-                    res.status(500).send('Try again');
+                    res.status(500).send('ERROR');
                 }      
             } else{
                 console.log(docs);
@@ -137,17 +138,17 @@ app.post('/login',cors,function(req,res){
         user.find({$and:[{email:{$eq:req.body.email}},{password:{$eq:SHA256(req.body.password)}}]},function(err,docs){
             if(err){
                 console.log(err);
-                res.status(500).send('Error');
+                res.status(500).send('ERROR');
             }
             else{
                 console.log(docs)
                 if(docs.length==0){
-                    res.status(404).send('Not present');
+                    res.status(404).send('REGISTER');
                 }
                 else{
                     jwt.sign({email:docs[0].email,timestamp:Date.now()},process.env.SECRET,function(err,token){
                         if(err){
-                            res.status(500).send('Try again');
+                            res.status(500).send('ERROR');
                         }
                         else{
                             res.header('Authorization',token);
@@ -162,8 +163,7 @@ app.post('/login',cors,function(req,res){
     }
 });
 
-
-//GETTING AVAILABLE USERS
+//GETTING AVAILABLE USERS WITHOUT A TEAM
 function getAvailableUsers(data){
     return new Promise(function(resolve){
         var send=[];
@@ -185,51 +185,52 @@ app.post('/getavail',cors,authorization,function(req,res){
     user.find({team:{$eq:null}},function(err,docs){
         if(err){
             console.log(err);
-            res.status(500).send('Error');
+            res.status(500).send('ERROR');
         }
         else{
-            var result=getAvailableUsers2(docs);
-            res.send(result);
-            result=null;
+            getAvailableUsers2(docs).then(function(result){
+                res.status(200).send(result);
+            }).catch(function(err){
+                res.status(500).send();
+            });
         }
     });
 });
-
 
 //SENDING INVITE TO A PERSON
 app.options('/sendinvite',cors,authorization,function(req,res){
     res.send();
 })
 app.post('/sendinvite',cors,authorization,function(req,res){
-    if(req.body.teamname==undefined||req.body.email==undefined||req.body.email==undefined){
+    if(req.body.teamname==undefined || req.body.email==undefined || req.body.sendtoemail==undefined){
         res.status(400).send('Enter all details');
     }
     else{
         team.find({$and:[{creater:{$eq:req.body.email}},{name:req.body.teamname}]},function(err,docs){
             if(err){
                 console.log(err);
-                res.status(500).send('Try again');
+                res.status(500).send('ERROR');
             }
             else{
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('No such team');
+                    res.status(404).send('TEAMNOTEXIST');
                 }
                 else{
                     user.update({$and:[{email:{$eq:req.body.sendtoemail}},{team:{$eq:null}}]},{$push:{pending:{teamname:req.body.teamname,creater:req.body.email}}},{new: true},function(err,docs){
                         if(err){
-                            res.status(500).send('Try again')
+                            res.status(500).send('ERROR')
                         }
                         else{
                             console.log(docs);
                             if(docs.n==0){
-                                res.status(404).send('No such user');
+                                res.status(404).send('NOUSERORINTEAM');
                             }
                             else if(docs.nModified==0){
-                                res.status(400).send('Try again');
+                                res.status(400).send('ERROR');
                             }
                             else {
-                                res.status(200).send('Invite sent')
+                                res.status(200).send('OK')
                             }
                         }      
                     });
@@ -262,7 +263,7 @@ app.post('/addteam',cors,authorization,function(req,res){
             else{
                 console.log(docs)
                 if(docs.length==0){
-                    res.status(401).send('Already in a team');
+                    res.status(401).send('INTEAM');
                 }
                 else{
                     //CREATING TEAMAND CHECKING FOR DUPLICATE
@@ -273,18 +274,18 @@ app.post('/addteam',cors,authorization,function(req,res){
                     },function(err,docs){
                         if(err){
                             if(err.code=11000){
-                                res.status(401).send('Duplicate team name');
+                                res.status(401).send('TEAMEXIST');
                             } else{
-                                res.status(500).send('Try again');
+                                res.status(500).send('ERROR');
                             }      
                         } else{
                             //UPDATING USER TEAMNAME
                             user.update({email:req.body.email},{$set:{team:req.body.teamname}},{new:true},function(err,docs){
                                 if(docs.n==0){
-                                    res.status(404).send('No such user');
+                                    res.status(404).send('NOUSER');
                                 }
                                 else if(docs.nModified==0){
-                                    res.status(400).send('Try again');
+                                    res.status(400).send('ERROR');
                                 }
                                 else {
                                     res.status(200).send("OK");
@@ -314,11 +315,11 @@ app.post('/pending',cors,authorization,function(req,res){
         user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err)
-                res.status(500).send('Error');
+                res.status(500).send('ERROR');
             } else {
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('You must have joined a team already');
+                    res.status(404).send('TEAMJOINED');
                 } else{
                     res.status(200).send(docs[0].pending);
                 }
@@ -340,16 +341,33 @@ app.post('/dashboard',cors,authorization,function(req,res){
         res.status(400).send('Enter all details');
     }
     else{
+        //FINDING USERS HAS TEAM OR NOT
         user.find({email:{$eq:req.body.email}},function(err,docs){
             if(err){
                 console.log(err)
-                res.status(500).send('Error');
+                res.status(500).send('ERROR');
             } else {
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('No such user');
+                    res.status(404).send('NOUSER');
                 } else{
-                    res.status(200).send(docs[0].team);
+                    if(docs[0].team==null){
+                        res.status(200).send('NOTEAMS')
+                    } else{
+                        //FINDING USERS TEAM AND TEAM MATE
+                        team.find({$or:[{creater:{$eq:req.body.email}},{member:{$eq:req.body.email}}]},function(err,docs){
+                            if(err){
+                                res.status(500).send('ERROR');
+                            } else {
+                                console.log(docs);
+                                res.status(200).send({
+                                    team:docs[0].name,
+                                    creater:docs[0].creater,
+                                    member:docs[0].member
+                                })
+                            }
+                        })
+                    }
                 }
             }
         });
@@ -375,28 +393,28 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
         user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err)
-                res.status(500).send('Error');
+                res.status(500).send('ERROR');
             } else {
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('You must have joined a team already');
+                    res.status(404).send('TEAMJOINORCREATE');
                 } else{
                     //CHECKING AND UPDATINF IF TEAM FREE
                     team.update({$and:[{name:{$eq:req.body.teamname}},{member:{$eq:null}}]},{$set:{member:req.body.email}},{new:true},function(err,docs){
                         if(docs.n==0){
-                            res.status(404).send('Team filled');
+                            res.status(404).send('TEAMFILLEDORDELETED');
                         }
                         else if(docs.nModified==0){
-                            res.status(400).send('Try again');
+                            res.status(400).send('ERROR');
                         }
                         else {
                             //UPDATING USER TEAM
                             user.update({email:req.body.email},{$set:{team:req.body.teamname}},{new:true},function(err,docs){
                                 if(docs.n==0){
-                                    res.status(404).send('No such user');
+                                    res.status(404).send('NOUSER');
                                 }
                                 else if(docs.nModified==0){
-                                    res.status(400).send('Try again');
+                                    res.status(400).send('ERROR');
                                 }
                                 else {
                                     res.status(200).send("OK");
@@ -421,21 +439,23 @@ app.post('/deleteteam',cors,authorization,function(req,res){
         res.status(400).send('Enter all details');
     }
     else{
+        //FIND IF TEAM HAS NO MEMBER ONLY CREATER THEN DELETE TEAM
         team.findOneAndRemove({$and:[{creater:{$eq:req.body.email}},{member:{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err)
-                res.status(500).send('Error');
+                res.status(500).send('ERROR');
             } else {
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(401).send('Someone must have joined your team already');
+                    res.status(401).send('TEAMFILLED');
                 } else{
+                    //UPDATE USERS WHOSE TEAM  HAD BEEN TO NULL BACK AGAIN
                     user.update({email:req.body.email},{$set:{team:null}},{new:true},function(err,docs){
                         if(docs.n==0){
-                            res.status(404).send('No such user');
+                            res.status(404).send('NOUSER');
                         }
                         else if(docs.nModified==0){
-                            res.status(400).send('Try again');
+                            res.status(400).send('ERROR');
                         }
                         else {
                             res.status(200).send("OK");
