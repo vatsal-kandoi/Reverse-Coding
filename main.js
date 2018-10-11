@@ -128,6 +128,10 @@ function authorization(req,res,next){
     });
 }
 
+app.get('/',function(req,res){
+    res.send('WORKING')
+})
+
 //HANDLING SIGNUP
 //OPTIONS ADDED TO ENABLE CORS WITH JSON DATA
 //INPUT NAME EMAIL REGNO PASSWORD PHONE
@@ -186,7 +190,7 @@ app.post('/login',cors,function(req,res){
                         else{
                             res.header('Authorization',token);
                             console.log(token);
-                            res.status(200).send('OK');                           
+                            res.status(200).send({status:'OK',email:docs[0].email,name:docs[0].name});                           
                         }
                     });
                     
@@ -222,7 +226,7 @@ app.post('/getavail',cors,authorization,function(req,res){
         }
         else{
             getAvailableUsers2(docs).then(function(result){
-                res.status(200).send(result);
+                res.status(200).send({status:'OK'});
             }).catch(function(err){
                 res.status(500).send();
             });
@@ -419,7 +423,7 @@ app.post('/dashboard',cors,authorization,function(req,res){
                     }
                     else{
                         //FINDING USERS TEAM AND TEAM MATE
-                        team.find({$or:[{creater:{$eq:req.body.email}},{member:{$eq:req.body.email}}]},function(err,docs){
+                        team.find({$or:[{"creater.email":{$eq:req.body.email}},{"member.email":{$eq:req.body.email}}]},function(err,docs){
                             if(err){
                                 res.status(500).send('ERROR');
                             } else {
