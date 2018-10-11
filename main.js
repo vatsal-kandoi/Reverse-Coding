@@ -224,7 +224,7 @@ async function getAvailableUsers2(data){
     var result=await getAvailableUsers(data);
     return result;
 }
-app.options('/getavail',cors,authorization,function(req,res){
+app.options('/getavail',cors,function(req,res){
     res.send();
 })
 app.post('/getavail',cors,authorization,function(req,res){
