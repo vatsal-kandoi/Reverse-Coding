@@ -235,7 +235,9 @@ app.post('/getavail',cors,authorization,function(req,res){
         }
         else{
             getAvailableUsers2(docs).then(function(result){
-                res.status(200).send({status:'OK'});
+                res.status(200).json(
+                    {"result":result}
+                    );
             }).catch(function(err){
                 res.status(500).send();
             });
@@ -245,7 +247,7 @@ app.post('/getavail',cors,authorization,function(req,res){
 
 
 //SENDING INVITE TO A PERSON
-app.options('/sendinvite',cors,authorization,function(req,res){
+app.options('/sendinvite',cors,function(req,res){
     res.send();
 })
 app.post('/sendinvite',cors,authorization,function(req,res){
@@ -308,7 +310,7 @@ app.post('/sendinvite',cors,authorization,function(req,res){
 //500 TRY AGAIN
 //404 NO SUCH USER
 //200 ADDED
-app.options('/addteam',cors,authorization,function(req,res){
+app.options('/addteam',cors,function(req,res){
     res.send();
 })
 app.post('/addteam',cors,authorization,function(req,res){
@@ -372,7 +374,7 @@ app.post('/addteam',cors,authorization,function(req,res){
 //500 ERROR
 //404 TEAM JOINED ALREaDY
 //200 PENDING LIST
-app.options('/pending',cors,authorization,function(req,res){
+app.options('/pending',cors,function(req,res){
     res.send();
 });
 app.post('/pending',cors,authorization,function(req,res){
@@ -401,7 +403,7 @@ app.post('/pending',cors,authorization,function(req,res){
 //500 INTERNAL ERROR
 //404 NO USER
 //200 TEAMNAME OR NULL
-app.options('/dashboard',cors,authorization,function(req,res){
+app.options('/dashboard',cors,function(req,res){
     res.send();
 });
 app.post('/dashboard',cors,authorization,function(req,res){
@@ -454,7 +456,7 @@ app.post('/dashboard',cors,authorization,function(req,res){
 
 //GET invitesSent
 
-app.options('/sentinvite',cors,authorization,function(req,res){
+app.options('/sentinvite',cors,function(req,res){
     res.send();
 });
 app.post('/sentinvite',cors,authorization,function(req,res){
@@ -485,7 +487,7 @@ app.post('/sentinvite',cors,authorization,function(req,res){
 //400 TRY AGAIN
 //200 OK->DONE
 
-app.options('/acceptinvite',cors,authorization,function(req,res){
+app.options('/acceptinvite',cors,function(req,res){
     res.send();
 });
 app.post('/acceptinvite',cors,authorization,function(req,res){
@@ -566,7 +568,7 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
 //TO DELETE TEAM IF NO ONE ADDED AS MEMBER
 //ONLY BY PEROSN WHO CREATED
 
-app.options('/deleteteam',cors,authorization,function(req,res){
+app.options('/deleteteam',cors,function(req,res){
     res.send();
 });
 app.post('/deleteteam',cors,authorization,function(req,res){
