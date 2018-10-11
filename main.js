@@ -103,10 +103,11 @@ app.use(bodyParser.json({ type: 'application/json' }))
 //EXPRESS MIDDLEWARE FOR CORS
 function cors(req,res,next){
     res.setHeader('Access-Control-Allow-Origin','*');
-    res.setHeader('Access-Control-Allow-Credentials','true');
+    res.setHeader('Access-Control-Allow-Credentials','false');
     res.setHeader('Access-Control-Allow-Methods','*');
+    res.setHeader('Access-Control-Request-Methods',"*");
     res.setHeader('Access-Control-Expose-Header','Authorization');
-    res.setHeader('Access-Control-Allow-Headers','Authorization,Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
+    res.setHeader('Access-Control-Allow-Headers','Authorization, Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
     next();
 };
 
