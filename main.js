@@ -419,7 +419,7 @@ app.post('/dashboard',cors,authorization,function(req,res){
                     }
                     else{
                         //FINDING USERS TEAM AND TEAM MATE
-                        team.find({$or:[{creater:{$eq:req.body.email}},{member:{$eq:req.body.email}}]},function(err,docs){
+                        team.find({$or:[{"creater.email":{$eq:req.body.email}},{"member.email":{$eq:req.body.email}}]},function(err,docs){
                             if(err){
                                 res.status(500).send('ERROR');
                             } else {
