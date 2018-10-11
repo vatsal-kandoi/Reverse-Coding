@@ -26,6 +26,17 @@ var userSchema=new Schema({
         unique:true,
         required:true
     },
+
+    invitesSent:[
+        {
+            name:{
+                type:String,
+            },
+            email:{
+                type:String
+            }
+        }
+    ],
     regno:{
         type:String,
         unique:true,
@@ -34,6 +45,10 @@ var userSchema=new Schema({
     password:{
         type:String,
         required:true
+    },
+    teamCreated:{
+        type:String,
+        default:null
     },
     team:{
         type:String,
@@ -44,7 +59,12 @@ var userSchema=new Schema({
             type:String,
         },
         creater:{
-            type:String,
+            name:{
+                type:String,
+            },
+            email:{
+                type:String,
+            }
         },        
     }]
 });
@@ -55,12 +75,24 @@ var teamSchema=new Schema({
         unique:true,
         required:true
     },
-    creater:{
-        type:String,
-    },
-    member:{
-        type:String
-    }
+    creater:
+        {
+            name:{
+                type:String,
+            },
+            email:{
+                type:String,
+            }
+        },
+    member:
+        {
+            name:{
+                type:String,
+            },
+            email:{
+                type:String,
+            }
+        },
 });
 var team=mongoose.model('team',teamSchema);
 
@@ -148,6 +180,7 @@ app.post('/login',cors,function(req,res){
                 else{
                     jwt.sign({email:docs[0].email,timestamp:Date.now()},process.env.SECRET,function(err,token){
                         if(err){
+                            console.log(err);
                             res.status(500).send('ERROR');
                         }
                         else{
@@ -197,16 +230,18 @@ app.post('/getavail',cors,authorization,function(req,res){
     });
 });
 
+
 //SENDING INVITE TO A PERSON
 app.options('/sendinvite',cors,authorization,function(req,res){
     res.send();
 })
 app.post('/sendinvite',cors,authorization,function(req,res){
-    if(req.body.teamname==undefined || req.body.email==undefined || req.body.sendtoemail==undefined){
+    if(req.body.teamname==undefined || req.body.email==undefined || req.body.sendtoemail==undefined || req.body.sendtoname==undefined || req.body.sendtoname==undefined){
+        console.log(req.body)
         res.status(400).send('Enter all details');
     }
     else{
-        team.find({$and:[{creater:{$eq:req.body.email}},{name:req.body.teamname}]},function(err,docs){
+        team.find({$and:[{name:req.body.teamname},{'member.name':{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err);
                 res.status(500).send('ERROR');
@@ -214,10 +249,10 @@ app.post('/sendinvite',cors,authorization,function(req,res){
             else{
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('TEAMNOTEXIST');
+                    res.status(404).send('TEAMNOTEXISTORFILLED');
                 }
                 else{
-                    user.update({$and:[{email:{$eq:req.body.sendtoemail}},{team:{$eq:null}}]},{$push:{pending:{teamname:req.body.teamname,creater:req.body.email}}},{new: true},function(err,docs){
+                    user.update({$and:[{email:{$eq:req.body.sendtoemail}}]},{$push:{pending:{teamname:req.body.teamname,creater:{name:docs[0].creater.name,email:req.body.email}}}},{new: true},function(err,docs){
                         if(err){
                             res.status(500).send('ERROR')
                         }
@@ -230,7 +265,18 @@ app.post('/sendinvite',cors,authorization,function(req,res){
                                 res.status(400).send('ERROR');
                             }
                             else {
-                                res.status(200).send('OK')
+                                user.update({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}}]},{$push:{invitesSent:{email:req.body.sendtoemail,name:req.body.sendtoname}}},{new: true},function(err,docs){
+                                console.log(docs);
+                                if(docs.n==0){
+                                    res.status(404).send('NOUSERORINTEAM');
+                                }
+                                else if(docs.nModified==0){
+                                    res.status(400).send('ERROR');
+                                }
+                                else {
+                                    res.status(200).send("OK");
+                                }
+                                });
                             }
                         }      
                     });
@@ -240,6 +286,7 @@ app.post('/sendinvite',cors,authorization,function(req,res){
         
     }    
 });
+
 
 //CREATE A NEW TEAM
 //REQUEST HAS TEAMNAME EMAIL
@@ -256,31 +303,37 @@ app.post('/addteam',cors,authorization,function(req,res){
         res.status(400).send('Enter all details');
     } else{
         //FINDING IF USER IS IN A TEAM
-        user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}}]},function(err,docs){
+        user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}},{teamCreated:{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err);
             }
             else{
                 console.log(docs)
                 if(docs.length==0){
-                    res.status(401).send('INTEAM');
+                    res.status(401).send('INTEAMORTEAMCREATED');
                 }
                 else{
                     //CREATING TEAMAND CHECKING FOR DUPLICATE
                     team.create({
                         name:req.body.teamname,
-                        creater:req.body.email,
-                        member:null
+                        creater:{
+                            name:docs[0].name,
+                            email:req.body.email
+                        },
+                        member:{
+                            name:null,
+                            email:null
+                        }
                     },function(err,docs){
                         if(err){
                             if(err.code=11000){
-                                res.status(401).send('TEAMEXIST');
+                                res.status(401).send('TEAMNAMEEXIST');
                             } else{
                                 res.status(500).send('ERROR');
                             }      
                         } else{
-                            //UPDATING USER TEAMNAME
-                            user.update({email:req.body.email},{$set:{team:req.body.teamname}},{new:true},function(err,docs){
+                            //UPDATING USER TEAMCREATED
+                            user.update({email:req.body.email},{$set:{teamCreated:req.body.teamname}},{new:true},function(err,docs){
                                 if(docs.n==0){
                                     res.status(404).send('NOUSER');
                                 }
@@ -298,6 +351,8 @@ app.post('/addteam',cors,authorization,function(req,res){
         });     
     }
 });
+
+
 
 //TO VIEW PENDING INVITES
 //HAS EMAIL AS BODY
@@ -351,9 +406,18 @@ app.post('/dashboard',cors,authorization,function(req,res){
                 if(docs.length==0){
                     res.status(404).send('NOUSER');
                 } else{
-                    if(docs[0].team==null){
+                    if(docs[0].team==null && docs[0].teamCreated==null){
                         res.status(200).send('NOTEAMS')
-                    } else{
+                    } 
+                    //IF TEAM CREATED BUT ONLY MEMBER
+                    else if(docs[0].teamCreated!=null){
+                        res.status(200).send({
+                            Code:"TEAMCREATED",
+                            name:docs[0].teamCreated,
+                            username:docs[0].name
+                        });
+                    }
+                    else{
                         //FINDING USERS TEAM AND TEAM MATE
                         team.find({$or:[{creater:{$eq:req.body.email}},{member:{$eq:req.body.email}}]},function(err,docs){
                             if(err){
@@ -366,8 +430,35 @@ app.post('/dashboard',cors,authorization,function(req,res){
                                     member:docs[0].member
                                 })
                             }
-                        })
+                        });
                     }
+                }
+            }
+        });
+    }
+});
+
+
+//GET invitesSent
+
+app.options('/sentinvite',cors,authorization,function(req,res){
+    res.send();
+});
+app.post('/sentinvite',cors,authorization,function(req,res){
+    if(req.body.email==undefined){
+        res.status(400).send('Enter all details');
+    }
+    else{
+        user.find({$and:[{email:{$eq:req.body.email}},{teamCreated:{$ne:null}},{team:{$eq:null}}]},function(err,docs){
+            if(err){
+                console.log(err)
+                res.status(500).send('ERROR');
+            } else {
+                console.log(docs);
+                if(docs.length==0){
+                    res.status(404).send('TEAMJOINEDORNEVERCREATED');
+                } else{
+                    res.status(200).send(docs[0].invitesSent);
                 }
             }
         });
@@ -385,22 +476,23 @@ app.options('/acceptinvite',cors,authorization,function(req,res){
     res.send();
 });
 app.post('/acceptinvite',cors,authorization,function(req,res){
-    if(req.body.teamname==undefined || req.body.email==undefined){
-        res.staus(400).send('Enter all details')
+    if(req.body.creatername==undefined || req.body.teamname==undefined || req.body.email==undefined){
+        res.status(400).send('Enter all details')
     }
     else{
         //FINDING IF NOT IN A TEAM
-        user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}}]},function(err,docs){
+        user.find({$and:[{email:{$eq:req.body.email}},{team:{$eq:null}},{pending:{$elemMatch:{teamname:req.body.teamname}}}]},function(err,docs){
             if(err){
                 console.log(err)
                 res.status(500).send('ERROR');
             } else {
                 console.log(docs);
                 if(docs.length==0){
-                    res.status(404).send('TEAMJOINORCREATE');
+                    res.status(401).send('TEAMJOINED');
                 } else{
                     //CHECKING AND UPDATINF IF TEAM FREE
-                    team.update({$and:[{name:{$eq:req.body.teamname}},{member:{$eq:null}}]},{$set:{member:req.body.email}},{new:true},function(err,docs){
+                    team.update({$and:[{name:{$eq:req.body.teamname}},{"member.name":{$eq:null}}]},{$set:{member:{email:req.body.email,name:docs[0].name}}},{new:true},function(err,docs){
+                        console.log(docs);
                         if(docs.n==0){
                             res.status(404).send('TEAMFILLEDORDELETED');
                         }
@@ -409,16 +501,46 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
                         }
                         else {
                             //UPDATING USER TEAM
-                            user.update({email:req.body.email},{$set:{team:req.body.teamname}},{new:true},function(err,docs){
-                                if(docs.n==0){
+                            user.findOneAndUpdate({email:req.body.email},{$set:{team:req.body.teamname,teamCreated:null,invitesSent:[]}},function(err,docs){
+                                console.log(docs);
+                                if(err){
+                                    res.status(500).send("ERROR")
+                                }
+                                else if(docs==undefined){
                                     res.status(404).send('NOUSER');
                                 }
-                                else if(docs.nModified==0){
+                                else if(docs.team!=null){
                                     res.status(400).send('ERROR');
                                 }
                                 else {
                                     res.status(200).send("OK");
                                 }
+                                if(docs.teamCreated!=null){
+                                    team.findOneAndRemove({name:docs.teamCreated},function(err,docs){
+                                        if(err){
+                                            console.log(err)
+                                        } else {
+                                            console.log(docs);
+                                            if(docs.length==0){
+                                                console.log('Not deleted');
+                                            }
+                                            else{
+                                                console.log('Team deleted')
+                                            }
+                                        }
+                                    });      
+                                }
+                                user.update({email:req.body.creatername},{$set:{team:req.body.teamname}},function(err,docs){
+                                    if(err){
+                                        console.log(err)
+                                    }
+                                    else if(docs.nModified==0){
+                                        console.log(docs);
+                                        console.log('ERROR CHECK WHY NOT TEAM MODIFYING')
+                                    }
+                                });
+
+                                
                             });                        
                         }
                     })
@@ -440,17 +562,18 @@ app.post('/deleteteam',cors,authorization,function(req,res){
     }
     else{
         //FIND IF TEAM HAS NO MEMBER ONLY CREATER THEN DELETE TEAM
-        team.findOneAndRemove({$and:[{creater:{$eq:req.body.email}},{member:{$eq:null}}]},function(err,docs){
+        team.findOneAndRemove({$and:[{"creater.email":{$eq:req.body.email}},{"member.name":{$eq:null}}]},function(err,docs){
             if(err){
                 console.log(err)
                 res.status(500).send('ERROR');
             } else {
                 console.log(docs);
-                if(docs.length==0){
+                if(docs==null){
                     res.status(401).send('TEAMFILLED');
-                } else{
+                }
+                else{
                     //UPDATE USERS WHOSE TEAM  HAD BEEN TO NULL BACK AGAIN
-                    user.update({email:req.body.email},{$set:{team:null}},{new:true},function(err,docs){
+                    user.update({email:req.body.email},{$set:{teamCreated:null,invitesSent:[]}},{new:true},function(err,docs){
                         if(docs.n==0){
                             res.status(404).send('NOUSER');
                         }
@@ -466,6 +589,7 @@ app.post('/deleteteam',cors,authorization,function(req,res){
         });
     }
 });
+
 
 
 app.use('*',function(req,res){

@@ -2,7 +2,7 @@
   "name": "reverse-coding",
   "version": "1.0.0",
   "description": "Reverse coding platform",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -14,7 +14,6 @@
     "dotenv": "^6.1.0",
     "express": "^4.16.3",
     "jsonwebtoken": "^8.3.0",
-    "mongodb": "^3.1.7",
     "mongoose": "^5.3.2"
   }
 }
