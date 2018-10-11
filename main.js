@@ -103,30 +103,42 @@ app.use(bodyParser.json({ type: 'application/json' }))
 //EXPRESS MIDDLEWARE FOR CORS
 function cors(req,res,next){
     res.setHeader('Access-Control-Allow-Origin','*');
-    res.setHeader('Access-Control-Allow-Credentials','true');
     res.setHeader('Access-Control-Allow-Methods','*');
-    res.setHeader('Access-Control-Allow-Headers','Authorization,Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
+    res.setHeader('Access-Control-Request-Methods',"*");
+    res.setHeader('Access-Control-Expose-Headers','Authorization, Content-Length');
+    res.setHeader('Access-Control-Allow-Headers','Authorization, Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
     next();
 };
 
+
+
 //EXPRESS MIDDLEWRE FOR AUTHORIZATION
 function authorization(req,res,next){
-    jwt.verify(req.get('Authorization'),process.env.SECRET, function(err, decoded) {
-        if(err){
-            console.log(err);
-            res.status(401).send('Unauthorised');
-        } else {
-            console.log(decoded.email);
-            if(decoded.email!=req.body.email || Date.now()-decoded.timestamp>86400000){
-                res.status(401).send('Try logging in again');
-            }
-            else{
-                res.header('Authorization',req.get('Authorization'));
-                next();
-            }
-        }    
-    });
+    if(req.get('Authorization')==undefined){
+        res.status(401).send();
+    }
+    else{
+        jwt.verify(req.get('Authorization'),process.env.SECRET, function(err, decoded) {
+            if(err){
+                console.log(err);
+                res.status(401).send('Unauthorised');
+            } else {
+                console.log(decoded.email);
+                if(decoded.email!=req.body.email || Date.now()-decoded.timestamp>86400000){
+                    res.status(401).send('Try logging in again');
+                }
+                else{
+                    res.header('Authorization',req.get('Authorization'));
+                    next();
+                }
+            }    
+        });
+    }    
 }
+
+app.get('/',function(req,res){
+    res.send('WORKING')
+})
 
 //HANDLING SIGNUP
 //OPTIONS ADDED TO ENABLE CORS WITH JSON DATA
@@ -186,7 +198,7 @@ app.post('/login',cors,function(req,res){
                         else{
                             res.header('Authorization',token);
                             console.log(token);
-                            res.status(200).send('OK');                           
+                            res.status(200).send({status:'OK',email:docs[0].email,name:docs[0].name});                           
                         }
                     });
                     
@@ -211,7 +223,7 @@ async function getAvailableUsers2(data){
     var result=await getAvailableUsers(data);
     return result;
 }
-app.options('/getavail',cors,authorization,function(req,res){
+app.options('/getavail',cors,function(req,res){
     res.send();
 })
 app.post('/getavail',cors,authorization,function(req,res){
@@ -222,7 +234,7 @@ app.post('/getavail',cors,authorization,function(req,res){
         }
         else{
             getAvailableUsers2(docs).then(function(result){
-                res.status(200).send(result);
+                res.status(200).send({result:result});
             }).catch(function(err){
                 res.status(500).send();
             });
@@ -232,7 +244,7 @@ app.post('/getavail',cors,authorization,function(req,res){
 
 
 //SENDING INVITE TO A PERSON
-app.options('/sendinvite',cors,authorization,function(req,res){
+app.options('/sendinvite',cors,function(req,res){
     res.send();
 })
 app.post('/sendinvite',cors,authorization,function(req,res){
@@ -295,7 +307,7 @@ app.post('/sendinvite',cors,authorization,function(req,res){
 //500 TRY AGAIN
 //404 NO SUCH USER
 //200 ADDED
-app.options('/addteam',cors,authorization,function(req,res){
+app.options('/addteam',cors,function(req,res){
     res.send();
 })
 app.post('/addteam',cors,authorization,function(req,res){
@@ -359,7 +371,7 @@ app.post('/addteam',cors,authorization,function(req,res){
 //500 ERROR
 //404 TEAM JOINED ALREaDY
 //200 PENDING LIST
-app.options('/pending',cors,authorization,function(req,res){
+app.options('/pending',cors,function(req,res){
     res.send();
 });
 app.post('/pending',cors,authorization,function(req,res){
@@ -388,7 +400,7 @@ app.post('/pending',cors,authorization,function(req,res){
 //500 INTERNAL ERROR
 //404 NO USER
 //200 TEAMNAME OR NULL
-app.options('/dashboard',cors,authorization,function(req,res){
+app.options('/dashboard',cors,function(req,res){
     res.send();
 });
 app.post('/dashboard',cors,authorization,function(req,res){
@@ -441,7 +453,7 @@ app.post('/dashboard',cors,authorization,function(req,res){
 
 //GET invitesSent
 
-app.options('/sentinvite',cors,authorization,function(req,res){
+app.options('/sentinvite',cors,function(req,res){
     res.send();
 });
 app.post('/sentinvite',cors,authorization,function(req,res){
@@ -472,7 +484,7 @@ app.post('/sentinvite',cors,authorization,function(req,res){
 //400 TRY AGAIN
 //200 OK->DONE
 
-app.options('/acceptinvite',cors,authorization,function(req,res){
+app.options('/acceptinvite',cors,function(req,res){
     res.send();
 });
 app.post('/acceptinvite',cors,authorization,function(req,res){
@@ -553,7 +565,7 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
 //TO DELETE TEAM IF NO ONE ADDED AS MEMBER
 //ONLY BY PEROSN WHO CREATED
 
-app.options('/deleteteam',cors,authorization,function(req,res){
+app.options('/deleteteam',cors,function(req,res){
     res.send();
 });
 app.post('/deleteteam',cors,authorization,function(req,res){
@@ -598,4 +610,4 @@ app.use('*',function(req,res){
 
 
 
-app.listen(3000);
+app.listen(process.env.PORT || 3000);
