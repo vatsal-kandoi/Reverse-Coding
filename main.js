@@ -104,8 +104,14 @@ app.use(bodyParser.json({ type: 'application/json' }))
 function cors(req,res,next){
     res.setHeader('Access-Control-Allow-Origin','*');
     res.setHeader('Access-Control-Allow-Methods','*');
+<<<<<<< HEAD
     res.setHeader('Access-Control-Request-Methods',"*");
     res.setHeader('Access-Control-Expose-Headers','Authorization, Content-Length');
+=======
+    res.setHeader('Access-Control-Max-Age',1728000); 
+    res.setHeader('Access-Control-Request-Methods',"*");
+    res.setHeader('Access-Control-Expose-Headers','Authorization');
+>>>>>>> 8c2655c2bf573b923ab8b6ef9bd43c89aff6e38c
     res.setHeader('Access-Control-Allow-Headers','Authorization, Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
     next();
 };
@@ -234,7 +240,13 @@ app.post('/getavail',cors,authorization,function(req,res){
         }
         else{
             getAvailableUsers2(docs).then(function(result){
+<<<<<<< HEAD
                 res.status(200).send({result:result});
+=======
+                res.status(200).json(
+                    {"result":result}
+                    );
+>>>>>>> 8c2655c2bf573b923ab8b6ef9bd43c89aff6e38c
             }).catch(function(err){
                 res.status(500).send();
             });
