@@ -105,27 +105,35 @@ function cors(req,res,next){
     res.setHeader('Access-Control-Allow-Origin','*');
     res.setHeader('Access-Control-Allow-Credentials','true');
     res.setHeader('Access-Control-Allow-Methods','*');
+    res.setHeader('Access-Control-Expose-Header','Authorization');
     res.setHeader('Access-Control-Allow-Headers','Authorization,Origin, Accept,Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers');
     next();
 };
 
+
+
 //EXPRESS MIDDLEWRE FOR AUTHORIZATION
 function authorization(req,res,next){
-    jwt.verify(req.get('Authorization'),process.env.SECRET, function(err, decoded) {
-        if(err){
-            console.log(err);
-            res.status(401).send('Unauthorised');
-        } else {
-            console.log(decoded.email);
-            if(decoded.email!=req.body.email || Date.now()-decoded.timestamp>86400000){
-                res.status(401).send('Try logging in again');
-            }
-            else{
-                res.header('Authorization',req.get('Authorization'));
-                next();
-            }
-        }    
-    });
+    if(req.get('Authorization')==undefined){
+        res.status(401).send();
+    }
+    else{
+        jwt.verify(req.get('Authorization'),process.env.SECRET, function(err, decoded) {
+            if(err){
+                console.log(err);
+                res.status(401).send('Unauthorised');
+            } else {
+                console.log(decoded.email);
+                if(decoded.email!=req.body.email || Date.now()-decoded.timestamp>86400000){
+                    res.status(401).send('Try logging in again');
+                }
+                else{
+                    res.header('Authorization',req.get('Authorization'));
+                    next();
+                }
+            }    
+        });
+    }    
 }
 
 app.get('/',function(req,res){
