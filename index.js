@@ -126,8 +126,9 @@ function authorization(req,res,next){
                 res.status(401).send({code:"UNAUTHORISED"});
             } else {
                 res.header('Authorization',req.get('Authorization'));
-                req.email=decoded.email;
-                req.name=decoded.name;
+                req.body.email=decoded.email;
+                req.body.name=decoded.name;
+                console.log(req.body.email)
                 next();
             }    
         });
@@ -145,6 +146,7 @@ app.options('/signup',cors,function(req,res){
 })
 app.post('/signup',cors,function(req,res){
     if(req.body.email==undefined || req.body.phone==undefined || req.body.name==undefined || req.body.regno==undefined || req.body.password==undefined){
+        console.log(req.body)
         res.status(404).send({code:'Enter all details'})
     } else{
         user.create({
@@ -212,18 +214,48 @@ app.post('/login',cors,function(req,res){
     }
 });
 
-function getAvailableUsers(data){
+function getAvailableUsers(data,data1){
     return new Promise(function(resolve){
+        var x=null;
+        for(var i=0;i<data.length;i++){
+            if(data[i].email==data1){
+                x=data[i].invitesSent;
+            }           
+        }
         var send=[];
         for(var i=0;i<data.length;i++){
-            send.push({email:data[i].email,name:data[i].name});
+            if(x!=null){
+                if(x.length>0){
+                    var ok=0;
+                    for(var j=0;j<x.length;j++){
+                        
+                        if(data[i].email!=x[j].email){
+                            ok++;
+                        }    
+                    }
+                    if(ok==x.length && data[i].email!=data1){
+                        send.push({email:data[i].email,name:data[i].name});
+                    }
+                }
+                else{
+                    if(data[i].email!=data1)
+                    {send.push({email:data[i].email,name:data[i].name});}
+                }
+            }
+            else{
+                if(data[i].email!=data1)
+                    {send.push({email:data[i].email,name:data[i].name});}
+            }
+                       
         }
+        console.log(send);
         resolve(send);
         send=null;
+        x=null
     });
 }
-async function getAvailableUsers2(data){
-    var result=await getAvailableUsers(data);
+async function getAvailableUsers2(data,data1){
+    var result=await getAvailableUsers(data,data1);
     return result;
 }
 
@@ -232,19 +264,37 @@ app.options('/getavail',cors,function(req,res){
     res.send();
 })
 app.post('/getavail',cors,authorization,function(req,res){
-    user.find({team:{$eq:null}},function(err,docs){
+    if(req.body.email==undefined){
+        res.status(400).send('Enter all details');
+    }
+    else{
+        user.find({email:{$eq:req.body.email}},function(err,docs1){
         if(err){
-            console.log(err);
+            console.log(err)
             res.status(500).send({code:'ERROR'});
-        }
-        else{
-            getAvailableUsers2(docs).then(function(result){
-                res.status(200).send({code:"OK",result:result});
-            }).catch(function(err){
-                res.status(500).send({code:"ERROR"});
-            });
+        } else {
+            if(docs1.length==0 || docs1==null){
+                res.status(404).send({code:'NOTFOUND'});
+            } else{
+                user.find({team:{$eq:null}},function(err,docs){
+                    if(err){
+                        console.log(err);
+                        res.status(500).send({code:'ERROR'});
+                    }
+                    else{
+                        getAvailableUsers2(docs,req.body.email).then(function(result){
+                            res.status(200).send({code:"OK",result:result});
+                        }).catch(function(err){
+                            console.log(err);
+                            res.status(500).send({code:"ERROR"});
+                        });
+                    }
+                });
+                
+            }
         }
     });
+    }
 });
 
 //DASHBOARD
@@ -277,21 +327,28 @@ app.post('/dashboard',cors,authorization,function(req,res){
                             name:docs[0].name
                         });
                     }
-                    else{
+                    else if(team!=null){
                         //FINDING USERS TEAM AND TEAM MATE
-                        team.find({$or:[{"creater.email":{$eq:req.body.email}},{"member.email":{$eq:req.body.email}}]},function(err,docs){
+                        team.find({$or:[{"creater.email":req.body.email},{"member.email":req.body.email}]},function(err,docs){
                             if(err){
                                 res.status(500).send({code:'ERROR'});
                             } else {
                                 console.log(docs);
+                                if(docs.length==0){
+                                    res.status(500).send();
+                                }
+                                else{
                                 res.status(200).send({
                                     code:"TEAMJOINED",
                                     team:docs[0].name,
                                     creater:docs[0].creater,
                                     member:docs[0].member
-                                })
+                                })}
                             }
                         });
+                    }
+                    else{
+                        res.status(500).send();
                     }
                 }
             }
@@ -431,8 +488,8 @@ app.options('/sendinvite',cors,function(req,res){
     res.send();
 })
 app.post('/sendinvite',cors,authorization,function(req,res){
-    if(req.body.email==undefined || req.body.sendtoemail==undefined){
-        res.status(400).send({code:'ENTERALL'});
+    if(req.body.email==undefined || req.body.sendtoemail==undefined || req.body.sendtoemail==req.body.email){
+        res.status(400).send({code:'ENTERALLORSAMEEMAIL'});
     }
     else{
         team.findOne({$and:[{'creater.email':{$eq:req.body.email}},{'member.email':{$eq:null}}]},function(err,docs){
@@ -519,33 +576,19 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
                                     res.status(500).send({code:'ERROR'});
                                 }
                                 else {
-                                    res.status(200).send({code:"OK"});
-                                }
-                                if(docs.teamCreated!=null){
-                                    team.findOneAndRemove({name:docs.teamCreated},function(err,docs){
-                                        if(err){
-                                            console.log(err)
-                                        } else {
-                                            console.log(docs);
-                                            if(docs.length==0){
-                                                console.log('Not deleted');
-                                            }
-                                            else{
-                                                console.log('Team deleted')
-                                            }
-                                        }
-                                    });      
-                                }
-                                user.update({email:req.body.creatername},{$set:{team:req.body.teamname}},function(err,docs){
-                                    if(err){
-                                        console.log(err)
-                                    }
-                                    else if(docs.nModified==0){
-                                        console.log(docs);
-                                        console.log('ERROR CHECK WHY NOT TEAM MODIFYING')
-                                    }
-                                });
+                                    user.findOneAndUpdate({teamCreated:req.body.teamname},{$set:{team:req.body.teamname}},function(err,docs){
+                                                if(err){
+                                                    console.log(err);
+                                                    res.status(500).send({code:"ERROR"})
+                                                }
+                                                else{
+                                                    res.status(200).send({code:"OK"});
+                                        
+                                                }
+                                            });
 
+                                        }
+                                    
                                 
                             });                        
                         }
@@ -574,13 +617,59 @@ app.post('/rejectinvite',cors,authorization,function(req,res){
                 console.log(docs);
                 res.status(500).send({code:"ERROR"});
             } else{
-                res.status(200).send({
-                    code:"OK"
-                })
+                var x=null;
+                for(var i=0;i<docs.pending.length;i++){
+                    if(docs.pending[i].teamname==req.body.teamname){
+                        x=docs.pending[i].creater.email;
+                    }
+                }
+                user.findOneAndUpdate({email:{$eq:x}},{$pull:{invitesSent:{email:req.body.email}}},function(err,docs){
+                if(err){
+                    res.status(500).send({code:"ERROR"})
+                }
+                else{
+                    res.status(200).send({
+                        code:"OK"
+                    })
+                }
+            });
+                    
             }
         });
     }
 });
+app.post('/cancelinvite',function(req,res){
+    if(req.body.email==undefined || req.body.sendtoemail==undefined){
+        res.status(400).send({code:'ENTERALL'});
+    }
+    else{
+        user.findOneAndUpdate({email:{$eq:req.body.email}},{$pull:{invitesSent:{email:req.body.sendtoemail}}},function(err,docs){
+            if(err){
+                console.log(err);
+                res.status(500).send({code:"ERROR"});
+            } else if(docs==undefined){
+                console.log(docs);
+                console.log(1);
+                res.status(500).send({code:"ERROR"});
+            } else{
+                console.log('SEconds')
+                user.update({email:{$eq:req.body.sendoemail}},{$pull:{pending:{creater:{email:req.body.email}}}},function(err,docs){
+                    if(err){
+                         
+                        console.log(err);
+                        res.status(500).send({code:"ERROR"});
+                    } else if(docs==undefined){
+                        console.log(0);
+                        console.log(docs);
+                        res.status(500).send({code:"ERROR"});
+                    } else{
+                        res.status(200).send({code:"OK"});
+                    }
+                });
+            }
+        });
+    }
+})
 //DEFAULT
 app.use('*',function(req,res){
     res.status(404).send('Not found');
