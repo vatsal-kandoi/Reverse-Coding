@@ -17,9 +17,38 @@ app.use(bodyParser.json({ type: 'application/json' }))
 
 //MONGOOSE SETUP
 mongoose.connect(process.env.PRODURL || "mongodb://localhost:27017/RC");
+var Schema=mongoose.Schema;
+const model = new Schema({
+
+    name:{
+        type:"string"
+    },
+    score:{
+        type:"number",
+        default: 0
+    },
+    questions:[
+            {
+            number:{
+                type:"number"
+            },
+            score:{
+                type:"number",
+                default:0
+            },
+            attempts:{
+                type:"array",
+                default:[]
+            }
+        }
+    ]
+
+});
+
+teamAttempts = mongoose.model("teamAttempts", model);
 
 //SETTING UP SCHEMA
-var Schema=mongoose.Schema;
+
 var userSchema=new Schema({
     name:{
         type:String,
@@ -128,6 +157,8 @@ function authorization(req,res,next){
                 res.header('Authorization',req.get('Authorization'));
                 req.body.email=decoded.email;
                 req.body.name=decoded.name;
+                req.body.team=decoded.team;
+                req.body.regno=decoded.regno;
                 console.log(req.body.email)
                 next();
             }    
@@ -160,7 +191,7 @@ app.post('/signup',cors,function(req,res){
                 }      
             } else{
                 console.log(docs);
-                jwt.sign({email:docs.email,name:docs.name,regno:req.body.regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
+                jwt.sign({email:docs.email,name:docs.name,team:docs.team,regno:req.body.regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
                     if(err){
                         console.log(err);
                         res.status(500).send({code:'ERROR'});
@@ -197,7 +228,11 @@ app.post('/login',cors,function(req,res){
                 }
                 else{
                     console.log(docs);
-                    jwt.sign({email:docs[0].email,name:docs[0].name,regno:docs[0].regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
+                    var team=docs[0].team;
+                    if(team==null && docs[0].teamCreated!=null){
+                        team=docs[0].teamCreated;
+                    }
+                    jwt.sign({email:docs[0].email,name:docs[0].name,team:team,regno:docs[0].regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
                         if(err){
                             console.log(err);
                             res.status(500).send({code:'ERROR'});
@@ -324,7 +359,8 @@ app.post('/dashboard',cors,authorization,function(req,res){
                         res.status(200).send({
                             code:"TEAMCREATED",
                             teamname:docs[0].teamCreated,
-                            name:docs[0].name
+                            name:docs[0].name,
+                            email:docs[0].email
                         });
                     }
                     else if(team!=null){
@@ -401,7 +437,26 @@ app.post('/addteam',cors,authorization,function(req,res){
                                     res.status(500).send({code:"ERROR"});
                                 }
                                 else {
-                                    res.status(200).send({code:"OK"});
+                                    teamAttempts.create({name:req.body.teamname},function(err,docs){
+                                        if(err){
+                                            res.status(500).send({code:"Error"})
+                                        } else{
+                                            jwt.sign({email:req.body.email,name:req.body.name,team:req.body.teamname,regno:req.body.regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
+                                                if(err){
+                                                    console.log(err);
+                                                    res.status(500).send({code:'ERROR'});
+                                                }
+                                                else{
+                                                  res.header('Authorization',token);
+                                                   console.log(token);
+                                                   res.status(200).send({code:"OK"})                                                   
+                                                                               
+                                                }
+                                            });
+                                        }
+
+                                    });
+                                                                        
                                 }
                             });                            
                         }
@@ -443,7 +498,17 @@ app.post('/deleteteam',cors,authorization,function(req,res){
                             res.status(500).send({code:'ERROR'});
                         }
                         else {
-                            res.status(200).send({code:"OK"});
+                            jwt.sign({email:req.body.email,name:req.body.name,team:null,regno:req.body.regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
+                                if(err){
+                                    console.log(err);
+                                    res.status(500).send({code:'ERROR'});
+                                }
+                                else{
+                                    res.header('Authorization',token);
+                                    console.log(token);
+                                    res.status(200).send({code:"OK"});                           
+                                }
+                            });
                         }
                     });  
                 }
@@ -582,7 +647,17 @@ app.post('/acceptinvite',cors,authorization,function(req,res){
                                                     res.status(500).send({code:"ERROR"})
                                                 }
                                                 else{
-                                                    res.status(200).send({code:"OK"});
+                                                    jwt.sign({email:req.body.email,name:req.body.name,team:req.body.teamname,regno:req.body.regno,timestamp:Date.now()},process.env.SECRET,function(err,token){
+                                                        if(err){
+                                                            console.log(err);
+                                                            res.status(500).send({code:'ERROR'});
+                                                        }
+                                                        else{
+                                                            res.header('Authorization',token);
+                                                            console.log(token);
+                                                            res.status(200).send({code:"OK"});                           
+                                                        }
+                                                    });
                                         
                                                 }
                                             });
